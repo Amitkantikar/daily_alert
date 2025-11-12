@@ -22,14 +22,13 @@ jobs:
           python-version: "3.11"
 
       - name: 📦 Install Dependencies
-        run: |
-          pip install yfinance requests pandas
+        run: pip install yfinance requests pandas
 
-      - name: 🔑 Create config.py
+      # ✅ Inject secrets into existing config.py safely
+      - name: 🔑 Inject Telegram Secrets
         run: |
-          echo "BOT_TOKEN = '${{ secrets.TELEGRAM_BOT_TOKEN }}'" > config.py
-          echo "CHAT_ID = '${{ secrets.TELEGRAM_CHAT_ID }}'" >> config.py
-          echo "NIFTY50_STOCKS = ['RELIANCE.NS','TCS.NS','INFY.NS','HDFCBANK.NS','ICICIBANK.NS','SBIN.NS','AXISBANK.NS','ITC.NS','LT.NS','ASIANPAINT.NS','HINDUNILVR.NS','SUNPHARMA.NS','KOTAKBANK.NS','BAJFINANCE.NS','ULTRACEMCO.NS','WIPRO.NS','HCLTECH.NS','BHARTIARTL.NS','NESTLEIND.NS']" >> config.py
+          sed -i "s|BOT_TOKEN = .*|BOT_TOKEN = '${{ secrets.TELEGRAM_BOT_TOKEN }}'|" config.py
+          sed -i "s|CHAT_ID = .*|CHAT_ID = '${{ secrets.TELEGRAM_CHAT_ID }}'|" config.py
 
       - name: 🚀 Run ATH Alert Script
         run: python ath_alert.py
