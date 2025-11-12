@@ -4,10 +4,11 @@ from datetime import datetime
 import pandas as pd
 import config
 import os
+import time
 
-# ==============================================================
-# TELEGRAM CONFIG
-# ==============================================================
+# ==============================================================  
+# TELEGRAM CONFIG  
+# ==============================================================  
 TELEGRAM_BOT_TOKEN = config.BOT_TOKEN
 TELEGRAM_CHAT_ID = config.CHAT_ID
 
@@ -20,48 +21,56 @@ def send_telegram_alert(message: str):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
     try:
-        response = requests.post(url, data=payload)
+        response = requests.post(url, data=payload, timeout=15)
         if response.status_code == 200:
             print("✅ Telegram alert sent successfully!")
+            return True
         else:
-            print(f"❌ Failed to send alert: {response.text}")
+            print(f"❌ Failed to send alert: {response.status_code} {response.text}")
+            return False
     except Exception as e:
         print(f"⚠️ Telegram send error: {e}")
+        return False
 
 
-# ==============================================================
-# STOCK ANALYSIS LOGIC
-# ==============================================================
-def check_all_time_high(symbol: str):
+def append_to_csv(file_path, data_dict):
+    """Append a single record (dictionary) to CSV file."""
+    df = pd.DataFrame([data_dict])
+    file_exists = os.path.isfile(file_path)
+    if not file_exists:
+        df.to_csv(file_path, index=False)
+    else:
+        df.to_csv(file_path, mode="a", header=False, index=False)
+
+
+# ==============================================================  
+# STOCK CHECK (returns tuple: (symbol, is_near_ath, log_record))
+# ==============================================================  
+def check_all_time_high_once(symbol: str, threshold_pct: float = 0.5):
     """
-    Fetch max available historical data for the symbol,
-    check if the current price is within 0.5% of all-time high,
-    log result to CSV, and send Telegram alert if yes.
+    Fetch historical data once, compute ATH and whether current price is within threshold_pct of ATH.
+    Returns: (symbol, is_near_ath: bool, log_data: dict)
     """
     try:
-        # Fetch historical data (max available)
         data = yf.download(symbol, period="max", interval="1d", auto_adjust=True, progress=False)
-
         if data.empty:
             print(f"⚠️ No data found for {symbol}")
-            return
+            return symbol, False, None
 
         # Handle possible multi-index columns
         if isinstance(data.columns, pd.MultiIndex):
             data.columns = data.columns.get_level_values(0)
 
-        # Extract current price & all-time high as floats
         current_price = float(data["Close"].iloc[-1])
         all_time_high = float(data["High"].max())
         diff_percent = ((all_time_high - current_price) / all_time_high) * 100
 
-        # Log output
         print(f"{symbol} | Current: {current_price:.2f} | ATH: {all_time_high:.2f} | Diff: {diff_percent:.2f}%")
 
         alert_sent = False
+        is_near = diff_percent <= threshold_pct
 
-        # Check alert condition
-        if diff_percent <= 0.5:
+        if is_near:
             message = (
                 f"🚨 {symbol} is near All-Time High!\n"
                 f"Current Price: {current_price:.2f}\n"
@@ -69,12 +78,8 @@ def check_all_time_high(symbol: str):
                 f"Difference: {diff_percent:.2f}%\n"
                 f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             )
-            send_telegram_alert(message)
-            alert_sent = True
-        else:
-            print("No alert — price not near ATH.")
+            alert_sent = send_telegram_alert(message)
 
-        # Save to log file
         log_data = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "symbol": symbol,
@@ -85,62 +90,41 @@ def check_all_time_high(symbol: str):
         }
 
         append_to_csv(LOG_FILE, log_data)
+        return symbol, is_near, log_data
 
     except Exception as e:
         print(f"⚠️ Error fetching {symbol}: {e}")
+        return symbol, False, None
 
 
-# ==============================================================
-# CSV LOGGING FUNCTION
-# ==============================================================
-def append_to_csv(file_path, data_dict):
-    """Append a single record (dictionary) to CSV file."""
-    df = pd.DataFrame([data_dict])
-    file_exists = os.path.isfile(file_path)
-
-    if not file_exists:
-        df.to_csv(file_path, index=False)
-    else:
-        df.to_csv(file_path, mode='a', header=False, index=False)
-
-
-# ==============================================================
-# MAIN SCRIPT EXECUTION
-# ==============================================================
+# ==============================================================  
+# MAIN  
+# ==============================================================  
 if __name__ == "__main__":
-    stock_list = config.NIFTY50_STOCKS
-    near_ath = []
+    stock_list = config.NIFTY50_STOCKS  # e.g., ["RELIANCE.NS", "TCS.NS", "INFY.NS"]
+    near_ath_symbols = []
+    processed = 0
 
     print(f"\n📈 Checking All-Time Highs — {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("======================================================\n")
 
-    for stock in stock_list:
-        try:
-            data = yf.download(stock, period="max", interval="1d", auto_adjust=True, progress=False)
-            if isinstance(data.columns, pd.MultiIndex):
-                data.columns = data.columns.get_level_values(0)
-            current_price = float(data["Close"].iloc[-1])
-            all_time_high = float(data["High"].max())
-            diff_percent = ((all_time_high - current_price) / all_time_high) * 100
+    for i, stock in enumerate(stock_list, 1):
+        print(f"[{i}/{len(stock_list)}] Scanning {stock}...")
+        symbol, is_near, log = check_all_time_high_once(stock)
+        processed += 1
+        if is_near:
+            near_ath_symbols.append(stock)
 
-            if diff_percent <= 0.5:
-                near_ath.append(stock)
+        # sleep 1s to avoid hitting rate limits
+        time.sleep(1)
 
-        except Exception as e:
-            print(f"⚠️ Error fetching {stock}: {e}")
-
+    # Summary message
     summary_msg = (
         f"✅ ATH Alert Summary ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})\n"
-        f"Total Stocks Checked: {len(stock_list)}\n"
-        f"Near ATH (≤0.5%): {len(near_ath)}\n"
-        f"Stocks: {', '.join(near_ath) if near_ath else 'None'}"
+        f"Total Stocks Checked: {processed}\n"
+        f"Near ATH (≤0.5%): {len(near_ath_symbols)}\n"
+        f"Stocks: {', '.join(near_ath_symbols) if near_ath_symbols else 'None'}"
     )
     send_telegram_alert(summary_msg)
 
     print("\n✅ All stocks processed — results saved to:", LOG_FILE)
-
-    for stock in stock_list:
-        check_all_time_high(stock)
-
-    print("\n✅ All stocks processed — results saved to:", LOG_FILE)
-
