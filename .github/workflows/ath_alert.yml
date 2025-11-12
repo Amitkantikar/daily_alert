@@ -1,0 +1,43 @@
+name: ATH Alert (Daily 3:15 PM IST)
+
+on:
+  schedule:
+    - cron: "45 9 * * *"   # Runs every day at 09:45 UTC = 15:15 IST
+  workflow_dispatch:        # Allow manual run
+
+permissions:
+  contents: write
+
+jobs:
+  run-ath-alert:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🧭 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 📦 Install Dependencies
+        run: |
+          pip install yfinance requests pandas
+
+      - name: 🔑 Create config.py
+        run: |
+          echo "BOT_TOKEN = '${{ secrets.TELEGRAM_BOT_TOKEN }}'" > config.py
+          echo "CHAT_ID = '${{ secrets.TELEGRAM_CHAT_ID }}'" >> config.py
+          echo "NIFTY50_STOCKS = ['RELIANCE.NS','TCS.NS','INFY.NS','HDFCBANK.NS','ICICIBANK.NS','SBIN.NS','AXISBANK.NS','ITC.NS','LT.NS','ASIANPAINT.NS','HINDUNILVR.NS','SUNPHARMA.NS','KOTAKBANK.NS','BAJFINANCE.NS','ULTRACEMCO.NS','WIPRO.NS','HCLTECH.NS','BHARTIARTL.NS','NESTLEIND.NS']" >> config.py
+
+      - name: 🚀 Run ATH Alert Script
+        run: python ath_alert.py
+
+      - name: 💾 Commit & Push Log File
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          git add ath_alert_log.csv || true
+          git commit -m "Daily ATH Alert Log Update $(date)" || echo "No changes to commit"
+          git push || echo "No push needed"
