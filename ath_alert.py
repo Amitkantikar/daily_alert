@@ -15,6 +15,9 @@ TELEGRAM_CHAT_ID = config.CHAT_ID
 # Path for storing log data
 LOG_FILE = "ath_alert_log.csv"
 
+# Alert threshold (percent distance from ATH). Set to 2.0 for 2%.
+THRESHOLD_PCT = 2.0
+
 
 def send_telegram_alert(message: str):
     """Send alert message to Telegram."""
@@ -46,7 +49,7 @@ def append_to_csv(file_path, data_dict):
 # ==============================================================  
 # STOCK CHECK (returns tuple: (symbol, is_near_ath, log_record))
 # ==============================================================  
-def check_all_time_high_once(symbol: str, threshold_pct: float = 0.5):
+def check_all_time_high_once(symbol: str, threshold_pct: float = THRESHOLD_PCT):
     """
     Fetch historical data once, compute ATH and whether current price is within threshold_pct of ATH.
     Returns: (symbol, is_near_ath: bool, log_data: dict)
@@ -63,7 +66,12 @@ def check_all_time_high_once(symbol: str, threshold_pct: float = 0.5):
 
         current_price = float(data["Close"].iloc[-1])
         all_time_high = float(data["High"].max())
-        diff_percent = ((all_time_high - current_price) / all_time_high) * 100
+
+        # percent below ATH (0 if at or above ATH)
+        if current_price >= all_time_high:
+            diff_percent = 0.0
+        else:
+            diff_percent = ((all_time_high - current_price) / all_time_high) * 100
 
         print(f"{symbol} | Current: {current_price:.2f} | ATH: {all_time_high:.2f} | Diff: {diff_percent:.2f}%")
 
@@ -72,10 +80,10 @@ def check_all_time_high_once(symbol: str, threshold_pct: float = 0.5):
 
         if is_near:
             message = (
-                f"🚨 {symbol} is near All-Time High!\n"
+                f"🚨 {symbol} is within {threshold_pct:.2f}% of its All-Time High!\n"
                 f"Current Price: {current_price:.2f}\n"
                 f"ATH: {all_time_high:.2f}\n"
-                f"Difference: {diff_percent:.2f}%\n"
+                f"Difference from ATH: {diff_percent:.2f}%\n"
                 f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             )
             alert_sent = send_telegram_alert(message)
@@ -110,7 +118,7 @@ if __name__ == "__main__":
 
     for i, stock in enumerate(stock_list, 1):
         print(f"[{i}/{len(stock_list)}] Scanning {stock}...")
-        symbol, is_near, log = check_all_time_high_once(stock)
+        symbol, is_near, log = check_all_time_high_once(stock, threshold_pct=THRESHOLD_PCT)
         processed += 1
         if is_near:
             near_ath_symbols.append(stock)
@@ -122,7 +130,7 @@ if __name__ == "__main__":
     summary_msg = (
         f"✅ ATH Alert Summary ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})\n"
         f"Total Stocks Checked: {processed}\n"
-        f"Near ATH (≤0.5%): {len(near_ath_symbols)}\n"
+        f"Near ATH (≤{THRESHOLD_PCT:.2f}%): {len(near_ath_symbols)}\n"
         f"Stocks: {', '.join(near_ath_symbols) if near_ath_symbols else 'None'}"
     )
     send_telegram_alert(summary_msg)
