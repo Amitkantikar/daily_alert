@@ -4,6 +4,37 @@ CHAT_ID = ""     # loaded dynamically from GitHub Actions secrets
 
 # === NIFTY 50 Stocks + GOLD + BITCOIN ===
 NIFTY50_STOCKS = [
+    "TIPSMUSIC.NS",
+    "ESABINDIA.NS",
+    "ITDC.NS",
+    "BALUFORGE.NS",
+    "GOKULAGRO.NS",  
+    "SKIPPER.NS",
+    "ELECTCAST.NS",
+    "BEML.NS",
+    "CEATLTD.NS",
+    "ISGEC.NS",
+    "OPTIEMUS.NS",
+    "GESHIP.NS",
+    "AXISCADES.NS",
+    "EDELWEISS.NS",
+    "LEMONTREE.NS",
+    "JKTYRE.NS",
+    "VARROC.NS",
+    "NCC.NS",
+    "NESCO.NS",
+    "SUBROS.NS",
+    "JINDALSAW.NS",
+    "GENUSPOWER.NS",
+    "LTFOODS.NS",
+    "AURIONPRO.NS",
+    "CUPID.NS",
+    "V2RETAIL.NS",
+    "CIEINDIA.NS",
+    "TEJASNET.NS",    
+    "THOMASCOOK.NS",
+    "LTF.NS",
+    "TEXRAIL.NS",
     "ABB.NS",
     "ADANIENSOL.NS",
     "ADANIENT.NS",
@@ -101,4 +132,5 @@ NIFTY50_STOCKS = [
     "WIPRO.NS",
     "ZYDUSLIFE.NS","CDSL.NS"
 ]
+
 
