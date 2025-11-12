@@ -108,12 +108,39 @@ def append_to_csv(file_path, data_dict):
 # MAIN SCRIPT EXECUTION
 # ==============================================================
 if __name__ == "__main__":
-    stock_list = config.NIFTY50_STOCKS  # e.g., ["RELIANCE.NS", "TCS.NS", "INFY.NS"]
+    stock_list = config.NIFTY50_STOCKS
+    near_ath = []
 
     print(f"\n📈 Checking All-Time Highs — {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("======================================================\n")
 
     for stock in stock_list:
+        try:
+            data = yf.download(stock, period="max", interval="1d", auto_adjust=True, progress=False)
+            if isinstance(data.columns, pd.MultiIndex):
+                data.columns = data.columns.get_level_values(0)
+            current_price = float(data["Close"].iloc[-1])
+            all_time_high = float(data["High"].max())
+            diff_percent = ((all_time_high - current_price) / all_time_high) * 100
+
+            if diff_percent <= 0.5:
+                near_ath.append(stock)
+
+        except Exception as e:
+            print(f"⚠️ Error fetching {stock}: {e}")
+
+    summary_msg = (
+        f"✅ ATH Alert Summary ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})\n"
+        f"Total Stocks Checked: {len(stock_list)}\n"
+        f"Near ATH (≤0.5%): {len(near_ath)}\n"
+        f"Stocks: {', '.join(near_ath) if near_ath else 'None'}"
+    )
+    send_telegram_alert(summary_msg)
+
+    print("\n✅ All stocks processed — results saved to:", LOG_FILE)
+
+    for stock in stock_list:
         check_all_time_high(stock)
 
     print("\n✅ All stocks processed — results saved to:", LOG_FILE)
+
