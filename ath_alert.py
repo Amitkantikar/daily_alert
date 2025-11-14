@@ -19,7 +19,7 @@ LOG_FILE = "ath_alert_log.csv"
 THRESHOLD_PCT = 2.0
 
 # Minimum number of candles since the most recent ATH (require ATH to be older than this)
-MIN_CANDLES_SINCE_ATH = 30
+MIN_CANDLES_SINCE_ATH = 10
 
 
 def send_telegram_alert(message: str):
